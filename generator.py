@@ -74,16 +74,18 @@ def first_name_render(image, coords, first_name, font_path):
     font_size = box_height
     font = ImageFont.truetype(font_path, font_size)
 
-    # Calculate total text width with spacing
     def get_text_size(text, font, spacing):
         width = 0
+        max_height = 0
         for i, char in enumerate(text):
-            char_width = font.getbbox(char)[2] - font.getbbox(char)[0]
+            bbox = font.getbbox(char)
+            char_width = bbox[2] - bbox[0]
+            char_height = bbox[3] - bbox[1]
             width += char_width
+            max_height = max(max_height, char_height)
             if i < len(text) - 1:
                 width += int(char_width * spacing)
-        height = font.getbbox(text)[3] - font.getbbox(text)[1]
-        return width, height
+        return width, max_height
 
     text_width, text_height = get_text_size(first_name, font, spacing_factor)
 
@@ -104,14 +106,14 @@ def first_name_render(image, coords, first_name, font_path):
                 if dx == 0 and dy == 0:
                     continue
                 cx = text_x
-                for i, char in enumerate(first_name):
+                for char in first_name:
                     draw.text((cx+dx, text_y+dy), char, font=font, fill=border_color)
                     char_width = font.getbbox(char)[2] - font.getbbox(char)[0]
                     cx += char_width + int(char_width * spacing_factor)
 
     # Draw main text
     cx = text_x
-    for i, char in enumerate(first_name):
+    for char in first_name:
         draw.text((cx, text_y), char, font=font, fill=color)
         char_width = font.getbbox(char)[2] - font.getbbox(char)[0]
         cx += char_width + int(char_width * spacing_factor)
@@ -121,6 +123,71 @@ def last_name_render(image, coords, last_name, font_path):
     Renders the last name onto the image using the provided coordinates and styling.
     - Fills the height of the box (coords) with the name, keeping font scaling consistent.
     - Centers the name in the box.
+    - Applies color, optional border/stroke, and custom letter spacing.
+    """
+    draw = ImageDraw.Draw(image)
+    x1, y1, x2, y2 = coords.get('coords', [0,0,0,0])
+    box_width = x2 - x1
+    box_height = y2 - y1
+    color = coords.get('color', '#ffffff')
+    border = coords.get('border', 'False') == 'True'
+    border_color = coords.get('border_color', '#000000')
+    border_width = int(coords.get('border_width', 0))
+    spacing_factor = float(coords.get('spacing_factor', 0))
+
+    # Find font size that fits the height
+    font_size = box_height
+    font = ImageFont.truetype(font_path, font_size)
+
+    def get_text_size(text, font, spacing):
+        width = 0
+        max_height = 0
+        for i, char in enumerate(text):
+            bbox = font.getbbox(char)
+            char_width = bbox[2] - bbox[0]
+            char_height = bbox[3] - bbox[1]
+            width += char_width
+            max_height = max(max_height, char_height)
+            if i < len(text) - 1:
+                width += int(char_width * spacing)
+        return width, max_height
+
+    text_width, text_height = get_text_size(last_name, font, spacing_factor)
+
+    # Reduce font size until it fits the box height
+    while text_height > box_height:
+        font_size -= 1
+        font = ImageFont.truetype(font_path, font_size)
+        text_width, text_height = get_text_size(last_name, font, spacing_factor)
+
+    # Center the text in the box
+    text_x = x1 + (box_width - text_width) // 2
+    text_y = y1 + (box_height - text_height) // 2
+
+    # Draw border if needed
+    if border and border_width > 0:
+        for dx in range(-border_width, border_width+1):
+            for dy in range(-border_width, border_width+1):
+                if dx == 0 and dy == 0:
+                    continue
+                cx = text_x
+                for char in last_name:
+                    draw.text((cx+dx, text_y+dy), char, font=font, fill=border_color)
+                    char_width = font.getbbox(char)[2] - font.getbbox(char)[0]
+                    cx += char_width + int(char_width * spacing_factor)
+
+    # Draw main text
+    cx = text_x
+    for char in last_name:
+        draw.text((cx, text_y), char, font=font, fill=color)
+        char_width = font.getbbox(char)[2] - font.getbbox(char)[0]
+        cx += char_width + int(char_width * spacing_factor)
+
+def render_sport(image, coords, sport_text, font_path):
+    """
+    Renders the sport text onto the image using the provided coordinates and styling.
+    - Fills the height of the box (coords) with the sport text, keeping font scaling consistent.
+    - Centers the sport text in the box.
     - Applies color, optional border/stroke, and custom letter spacing.
     """
     draw = ImageDraw.Draw(image)
@@ -148,13 +215,13 @@ def last_name_render(image, coords, last_name, font_path):
         height = font.getbbox(text)[3] - font.getbbox(text)[1]
         return width, height
 
-    text_width, text_height = get_text_size(last_name, font, spacing_factor)
+    text_width, text_height = get_text_size(sport_text, font, spacing_factor)
 
     # Reduce font size until it fits the box height
     while text_height > box_height:
         font_size -= 1
         font = ImageFont.truetype(font_path, font_size)
-        text_width, text_height = get_text_size(last_name, font, spacing_factor)
+        text_width, text_height = get_text_size(sport_text, font, spacing_factor)
 
     # Center the text in the box
     text_x = x1 + (box_width - text_width) // 2
@@ -167,14 +234,14 @@ def last_name_render(image, coords, last_name, font_path):
                 if dx == 0 and dy == 0:
                     continue
                 cx = text_x
-                for i, char in enumerate(last_name):
+                for char in sport_text:
                     draw.text((cx+dx, text_y+dy), char, font=font, fill=border_color)
                     char_width = font.getbbox(char)[2] - font.getbbox(char)[0]
                     cx += char_width + int(char_width * spacing_factor)
 
     # Draw main text
     cx = text_x
-    for i, char in enumerate(last_name):
+    for char in sport_text:
         draw.text((cx, text_y), char, font=font, fill=color)
         char_width = font.getbbox(char)[2] - font.getbbox(char)[0]
         cx += char_width + int(char_width * spacing_factor)
@@ -216,6 +283,9 @@ def main():
 
             # Render last name
             last_name_render(image, coords.get('LastName', {}), row['Player Name'].split()[-1], text_font_path)
+
+            # Render sport
+            render_sport(image, coords.get('Sport', {}), row['Sport Specific'], text_font_path)
 
             # Save image with "-1" at the end of the name
             output_path = os.path.join(asset_path, f"{row['Name']}-1.png")
