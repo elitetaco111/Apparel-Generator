@@ -53,16 +53,18 @@ def number_render(image, coords, number, font_path):
     # Draw main text
     draw.text((text_x, text_y), number, font=font, fill=color)
 
-def first_name_render(image, coords, first_name, font_path):
+def first_name_render(image, coords, first_name, font_path, lines_coords):
     """
-    Renders the first name onto the image using the provided coordinates and styling.
-    - Fills the height of the box (coords) with the name, keeping font scaling consistent.
-    - Centers the name in the box.
-    - Applies color, optional border/stroke, and custom letter spacing.
+    Renders the first name vertically stretched to fit the y-coords box, centered horizontally.
+    - Reads y-coords from coords['y-coords'] (top and bottom).
+    - Stretches the text to fill the vertical space.
+    - Centers the text horizontally in the image.
+    - Calculates and stores the width as name_width.
+    - Calls draw_lines(name_width, coords) (to be implemented).
+    - Uses spacing_factor for extra spacing between letters.
+    - Implements border logic.
     """
-    draw = ImageDraw.Draw(image)
-    x1, y1, x2, y2 = coords.get('coords', [0,0,0,0])
-    box_width = x2 - x1
+    y1, y2 = coords.get('y-coords', [0, 0])
     box_height = y2 - y1
     color = coords.get('color', '#ffffff')
     border = coords.get('border', 'False') == 'True'
@@ -70,53 +72,114 @@ def first_name_render(image, coords, first_name, font_path):
     border_width = int(coords.get('border_width', 0))
     spacing_factor = float(coords.get('spacing_factor', 0))
 
-    # Find font size that fits the height
-    font_size = box_height
-    font = ImageFont.truetype(font_path, font_size)
-
+    # Find the largest font size that fits the box height
+    min_font_size = 1
+    max_font_size = box_height
+    best_font_size = min_font_size
+    from PIL import ImageFont, ImageDraw, Image
     def get_text_size(text, font, spacing):
         width = 0
         max_height = 0
+        char_widths = []
         for i, char in enumerate(text):
             bbox = font.getbbox(char)
             char_width = bbox[2] - bbox[0]
             char_height = bbox[3] - bbox[1]
+            char_widths.append(char_width)
             width += char_width
             max_height = max(max_height, char_height)
             if i < len(text) - 1:
                 width += int(char_width * spacing)
-        return width, max_height
+        return width, max_height, char_widths
 
-    text_width, text_height = get_text_size(first_name, font, spacing_factor)
+    while min_font_size <= max_font_size:
+        mid_font_size = (min_font_size + max_font_size) // 2
+        font = ImageFont.truetype(font_path, mid_font_size)
+        _, text_height, _ = get_text_size(first_name, font, spacing_factor)
+        if text_height <= box_height:
+            best_font_size = mid_font_size
+            min_font_size = mid_font_size + 1
+        else:
+            max_font_size = mid_font_size - 1
 
-    # Reduce font size until it fits the box height
-    while text_height > box_height:
-        font_size -= 1
-        font = ImageFont.truetype(font_path, font_size)
-        text_width, text_height = get_text_size(first_name, font, spacing_factor)
+    font = ImageFont.truetype(font_path, best_font_size)
+    ascent, descent = font.getmetrics()
+    _, text_height, char_widths = get_text_size(first_name, font, spacing_factor)
+    num_gaps = max(len(first_name) - 1, 0)
 
-    # Center the text in the box
-    text_x = x1 + (box_width - text_width) // 2
-    text_y = y1 + (box_height - text_height) // 2
+    # Calculate total width with spacing
+    total_char_width = sum(char_widths)
+    total_spacing = sum([int(char_widths[i] * spacing_factor) for i in range(num_gaps)])
+    name_width = total_char_width + total_spacing
+
+    # Use ascent + descent for true text height
+    true_text_height = ascent + descent
+
+    # Create a transparent image for the text (use true_text_height)
+    text_img = Image.new("RGBA", (name_width, true_text_height), (0, 0, 0, 0))
+    text_draw = ImageDraw.Draw(text_img)
 
     # Draw border if needed
     if border and border_width > 0:
-        for dx in range(-border_width, border_width+1):
-            for dy in range(-border_width, border_width+1):
+        for dx in range(-border_width, border_width + 1):
+            for dy in range(-border_width, border_width + 1):
                 if dx == 0 and dy == 0:
                     continue
-                cx = text_x
-                for char in first_name:
-                    draw.text((cx+dx, text_y+dy), char, font=font, fill=border_color)
-                    char_width = font.getbbox(char)[2] - font.getbbox(char)[0]
-                    cx += char_width + int(char_width * spacing_factor)
+                cx = 0
+                for i, char in enumerate(first_name):
+                    # Draw at (cx + dx, ascent + dy - ascent) so baseline is correct
+                    text_draw.text((cx + dx, dy), char, font=font, fill=border_color)
+                    char_width = char_widths[i]
+                    cx += char_width
+                    if i < len(first_name) - 1:
+                        cx += int(char_width * spacing_factor)
 
     # Draw main text
-    cx = text_x
-    for char in first_name:
-        draw.text((cx, text_y), char, font=font, fill=color)
-        char_width = font.getbbox(char)[2] - font.getbbox(char)[0]
-        cx += char_width + int(char_width * spacing_factor)
+    cx = 0
+    for i, char in enumerate(first_name):
+        text_draw.text((cx, 0), char, font=font, fill=color)
+        char_width = char_widths[i]
+        cx += char_width
+        if i < len(first_name) - 1:
+            cx += int(char_width * spacing_factor)
+
+    # Stretch vertically to fit the box
+    stretched_img = text_img.resize((name_width, box_height), Image.LANCZOS)
+
+    # Center horizontally on the image
+    image_width = image.width
+    center_x = (image_width - name_width) // 2
+    image.paste(stretched_img, (center_x, y1), stretched_img)
+
+    # Call draw_lines with name_width and coords
+    draw_lines(image, name_width, lines_coords)
+
+def draw_lines(image, name_width, coords):
+    """
+    Draws a horizontal rectangle (line) within the box defined by coords['coords'] (x1, y1, x2, y2),
+    with a centered gap that is name_width + 80 pixels wide.
+    The center of the gap is aligned with the center of the image.
+    The rectangle uses the color from coords['color'].
+    """
+    x1, y1, x2, y2 = coords.get('coords', [0, 0, 0, 0])
+    color = coords.get('color', '#ffffff')
+    gap_width = name_width + 80
+
+    image_center_x = image.width // 2
+    gap_left = image_center_x - gap_width // 2
+    gap_right = gap_left + gap_width
+
+    # Clamp gap to box
+    gap_left = max(gap_left, x1)
+    gap_right = min(gap_right, x2)
+
+    draw = ImageDraw.Draw(image)
+    # Draw left rectangle (from x1 to gap_left)
+    if gap_left > x1:
+        draw.rectangle([x1, y1, gap_left, y2], fill=color)
+    # Draw right rectangle (from gap_right to x2)
+    if gap_right < x2:
+        draw.rectangle([gap_right, y1, x2, y2], fill=color)
 
 def last_name_render(image, coords, last_name, font_path):
     """
@@ -171,7 +234,7 @@ def last_name_render(image, coords, last_name, font_path):
 
     # 2. Calculate required total width (including spacing and stretching)
     total_char_width = sum(char_widths)
-    max_stretch = 1.5
+    max_stretch = 1.8
     stretch_factor = min(box_width / total_char_width, max_stretch)
     stretched_width = total_char_width * stretch_factor
     remaining_width = box_width - stretched_width
@@ -292,7 +355,7 @@ def render_sport(image, coords, sport_text, font_path):
     # => (sum(char_widths) * stretch_factor) + (spacing * num_gaps) = box_width
 
     # We'll try to maximize stretch_factor up to a reasonable limit (e.g., 1.5), then use spacing for the rest
-    max_stretch = 1.5
+    max_stretch = 1.8
     stretch_factor = min(box_width / total_char_width, max_stretch)
     stretched_width = total_char_width * stretch_factor
     remaining_width = box_width - stretched_width
@@ -378,7 +441,7 @@ def main():
             number_render(image, coords.get('Number', {}), row['Jersey Characters'], number_font_path)
 
             # Render first name
-            first_name_render(image, coords.get('FirstName', {}), row['Player Name'].split()[0], text_font_path)
+            first_name_render(image, coords.get('FirstName', {}), row['Player Name'].split()[0], text_font_path, coords.get("Lines", {}))
 
             # Render last name
             last_name_render(image, coords.get('LastName', {}), row['Player Name'].split()[-1], text_font_path)
