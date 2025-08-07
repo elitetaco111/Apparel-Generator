@@ -122,7 +122,7 @@ def last_name_render(image, coords, last_name, font_path):
     """
     Renders the last name onto the image using the provided coordinates and styling.
     - Fills the height of the box (coords) with the name, keeping font scaling consistent.
-    - Stretches the letters up to 20% horizontally, then adds spacing as needed to fit the box.
+    - Stretches the letters and adds spacing as needed to fit BOTH the height and width of the box.
     - Centers the name in the box.
     - Applies color, optional border/stroke, and custom letter spacing.
     """
@@ -135,10 +135,6 @@ def last_name_render(image, coords, last_name, font_path):
     border_color = coords.get('border_color', '#000000')
     border_width = int(coords.get('border_width', 0))
     base_spacing_factor = float(coords.get('spacing_factor', 0))
-
-    # Find font size that fits the height
-    font_size = box_height
-    font = ImageFont.truetype(font_path, font_size)
 
     def get_text_size(text, font, spacing):
         width = 0
@@ -155,33 +151,42 @@ def last_name_render(image, coords, last_name, font_path):
                 width += int(char_width * spacing)
         return width, max_height, char_widths
 
-    # Fit font size to box height
-    text_width, text_height, char_widths = get_text_size(last_name, font, base_spacing_factor)
-    while text_height > box_height:
-        font_size -= 1
-        font = ImageFont.truetype(font_path, font_size)
-        text_width, text_height, char_widths = get_text_size(last_name, font, base_spacing_factor)
+    # 1. Find the largest font size that fits the box height
+    min_font_size = 1
+    max_font_size = box_height
+    best_font_size = min_font_size
+    while min_font_size <= max_font_size:
+        mid_font_size = (min_font_size + max_font_size) // 2
+        font = ImageFont.truetype(font_path, mid_font_size)
+        _, text_height, _ = get_text_size(last_name, font, base_spacing_factor)
+        if text_height <= box_height:
+            best_font_size = mid_font_size
+            min_font_size = mid_font_size + 1
+        else:
+            max_font_size = mid_font_size - 1
 
-    # Calculate stretch factor (max 1.2)
-    stretch_factor = min(box_width / text_width if text_width > 0 else 1.0, 1.2)
+    font = ImageFont.truetype(font_path, best_font_size)
+    _, text_height, char_widths = get_text_size(last_name, font, 0)
+    num_gaps = max(len(last_name) - 1, 0)
 
-    # Calculate new width after stretching
-    stretched_width = sum(int(w * stretch_factor) for w in char_widths)
-    # Calculate how much space remains for spacing
+    # 2. Calculate required total width (including spacing and stretching)
+    total_char_width = sum(char_widths)
+    max_stretch = 1.5
+    stretch_factor = min(box_width / total_char_width, max_stretch)
+    stretched_width = total_char_width * stretch_factor
     remaining_width = box_width - stretched_width
-    num_gaps = max(len(last_name) - 1, 1)
-    # If stretch is less than needed, add spacing to fit
-    if remaining_width > 0:
-        spacing = remaining_width / num_gaps
-    else:
+    spacing = max(remaining_width / num_gaps, 0)
+
+    # If stretch_factor is less than max_stretch, spacing will be 0 or negative, so clamp to 0 and recalc stretch
+    if spacing < 0:
         spacing = 0
+        stretch_factor = box_width / total_char_width
 
-    # Center the text in the box
-    total_width = stretched_width + spacing * (len(last_name) - 1)
+    # 3. Center the text in the box
+    total_width = stretched_width + spacing * num_gaps
     text_x = x1 + (box_width - total_width) // 2
-    text_y = y1 + (box_height - text_height) // 2
-
-    # Draw border if needed
+    text_y = y1
+    # 4. Draw border if needed
     if border and border_width > 0:
         for dx in range(-border_width, border_width+1):
             for dy in range(-border_width, border_width+1):
@@ -189,41 +194,44 @@ def last_name_render(image, coords, last_name, font_path):
                     continue
                 cx = text_x
                 for i, char in enumerate(last_name):
-                    char_img = Image.new("RGBA", (font_size * 2, font_size * 2), (0, 0, 0, 0))
+                    char_img = Image.new("RGBA", (best_font_size * 2, best_font_size * 2), (0, 0, 0, 0))
                     char_draw = ImageDraw.Draw(char_img)
                     char_draw.text((0, 0), char, font=font, fill=border_color)
                     char_bbox = char_img.getbbox()
                     char_img = char_img.crop(char_bbox)
                     char_width = char_bbox[2] - char_bbox[0]
+                    char_height = char_bbox[3] - char_bbox[1]
                     stretched_char_width = int(char_width * stretch_factor)
-                    char_img = char_img.resize((stretched_char_width, char_img.height), Image.LANCZOS)
+                    stretched_char_height = box_height  # Stretch vertically to fill box
+                    char_img = char_img.resize((stretched_char_width, stretched_char_height), Image.LANCZOS)
                     image.paste(char_img, (int(cx+dx), int(text_y+dy)), char_img)
                     cx += stretched_char_width
                     if i < len(last_name) - 1:
                         cx += spacing
 
-    # Draw main text
+    # 5. Draw main text
     cx = text_x
     for i, char in enumerate(last_name):
-        char_img = Image.new("RGBA", (font_size * 2, font_size * 2), (0, 0, 0, 0))
+        char_img = Image.new("RGBA", (best_font_size * 2, best_font_size * 2), (0, 0, 0, 0))
         char_draw = ImageDraw.Draw(char_img)
         char_draw.text((0, 0), char, font=font, fill=color)
         char_bbox = char_img.getbbox()
         char_img = char_img.crop(char_bbox)
         char_width = char_bbox[2] - char_bbox[0]
+        char_height = char_bbox[3] - char_bbox[1]
         stretched_char_width = int(char_width * stretch_factor)
-        char_img = char_img.resize((stretched_char_width, char_img.height), Image.LANCZOS)
+        stretched_char_height = box_height  # Stretch vertically to fill box
+        char_img = char_img.resize((stretched_char_width, stretched_char_height), Image.LANCZOS)
         image.paste(char_img, (int(cx), int(text_y)), char_img)
         cx += stretched_char_width
+        #only add spacing if not the last character
         if i < len(last_name) - 1:
             cx += spacing
 
 def render_sport(image, coords, sport_text, font_path):
     """
     Renders the sport text onto the image using the provided coordinates and styling.
-    - Uses binary search to find the largest font size that fits the box height.
-    - Stretches the text horizontally to fill the bounding box width (can stretch font a bit).
-    - Adds spacing between letters if stretch exceeds 20%.
+    - Fits BOTH the height and width of the bounding box by stretching letters and adding even spacing.
     - Centers the sport text in the box.
     - Applies color, optional border/stroke, and custom letter spacing.
     """
@@ -252,7 +260,7 @@ def render_sport(image, coords, sport_text, font_path):
                 width += int(char_width * spacing)
         return width, max_height, char_widths
 
-    # Binary search for the largest font size that fits the box height
+    # 1. Find the largest font size that fits the box height
     min_font_size = 1
     max_font_size = box_height
     best_font_size = min_font_size
@@ -267,39 +275,40 @@ def render_sport(image, coords, sport_text, font_path):
             max_font_size = mid_font_size - 1
 
     font = ImageFont.truetype(font_path, best_font_size)
-    spacing_factor = base_spacing_factor
-    text_width, text_height, char_widths = get_text_size(sport_text, font, spacing_factor)
-    # Allow up to 30% stretch for a fuller fit
-    stretch_factor = min(box_width / text_width if text_width > 0 else 1.0, 1.5)
+    _, text_height, char_widths = get_text_size(sport_text, font, 0)
+    num_gaps = max(len(sport_text) - 1, 1)
 
-    # --- Add more spacing between letters ---
-    # Set a minimum extra spacing factor (e.g., 0.2 = 20% of char width)
-    min_extra_spacing = 0.8
-    spacing_factor = base_spacing_factor + min_extra_spacing
+    # 2. Calculate required total width (including spacing and stretching)
+    total_char_width = sum(char_widths)
+    # The minimum width is just the sum of the chars (no spacing)
+    # The maximum width is box_width
+    # We want: total_stretched_width + total_spacing = box_width
+    # Let stretch_factor be applied to each char, and spacing be the space between each char
 
-    text_width, text_height, char_widths = get_text_size(sport_text, font, spacing_factor)
-    stretch_factor = min(box_width / text_width if text_width > 0 else 1.0, 1.5)
+    # Solve for stretch_factor and spacing:
+    # total_stretched_width = sum(char_widths) * stretch_factor
+    # total_spacing = spacing * num_gaps
+    # total_stretched_width + total_spacing = box_width
+    # => (sum(char_widths) * stretch_factor) + (spacing * num_gaps) = box_width
 
-    # If stretch is more than 1.5, add even more spacing, but keep it even
-    if box_width / text_width > 1.5:
-        extra_width = box_width - (text_width * 1.5)
-        num_spaces = max(len(sport_text) - 1, 1)
-        spacing_factor = base_spacing_factor + min_extra_spacing + (extra_width / (num_spaces * best_font_size))
-        text_width, text_height, char_widths = get_text_size(sport_text, font, spacing_factor)
-        stretch_factor = min(box_width / text_width if text_width > 0 else 1.0, 1.5)
+    # We'll try to maximize stretch_factor up to a reasonable limit (e.g., 1.5), then use spacing for the rest
+    max_stretch = 1.5
+    stretch_factor = min(box_width / total_char_width, max_stretch)
+    stretched_width = total_char_width * stretch_factor
+    remaining_width = box_width - stretched_width
+    spacing = max(remaining_width / num_gaps, 0)
 
-    # Calculate total stretched width for centering
-    total_stretched_width = 0
-    for i, char_width in enumerate(char_widths):
-        total_stretched_width += int(char_width * stretch_factor)
-        if i < len(sport_text) - 1:
-            total_stretched_width += int(char_width * spacing_factor)
+    # If stretch_factor is less than max_stretch, spacing will be 0 or negative, so clamp to 0 and recalc stretch
+    if spacing < 0:
+        spacing = 0
+        stretch_factor = box_width / total_char_width
 
-    # Center vertically and horizontally
-    text_x = x1 + (box_width - total_stretched_width) // 2
+    # 3. Center the text in the box
+    total_width = stretched_width + spacing * num_gaps
+    text_x = x1 + (box_width - total_width) // 2
     text_y = y1 + (box_height - text_height) // 2
 
-    # Draw border if needed
+    # 4. Draw border if needed
     if border and border_width > 0:
         for dx in range(-border_width, border_width+1):
             for dy in range(-border_width, border_width+1):
@@ -318,9 +327,9 @@ def render_sport(image, coords, sport_text, font_path):
                     image.paste(char_img, (int(cx+dx), int(text_y+dy)), char_img)
                     cx += stretched_width
                     if i < len(sport_text) - 1:
-                        cx += int(char_width * spacing_factor)
+                        cx += spacing
 
-    # Draw main text
+    # 5. Draw main text
     cx = text_x
     for i, char in enumerate(sport_text):
         char_img = Image.new("RGBA", (best_font_size * 2, best_font_size * 2), (0, 0, 0, 0))
@@ -334,7 +343,7 @@ def render_sport(image, coords, sport_text, font_path):
         image.paste(char_img, (int(cx), int(text_y)), char_img)
         cx += stretched_width
         if i < len(sport_text) - 1:
-            cx += int(char_width * spacing_factor)
+            cx += spacing
 
 def get_asset_folder(row):
     team = row['Team']
