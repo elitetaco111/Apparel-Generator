@@ -1,6 +1,11 @@
 #program to create NIL apparel images
 #Created by Dave Nissly
 
+#add printer file png of just logo with no blank
+#jpg for website image png for printer image
+#deduplication for printer images
+#
+
 import csv
 import os
 import json
@@ -344,7 +349,9 @@ def render_sport(image, coords, sport_text, font_path):
     total_unstretched_width = total_char_width + total_min_spacing
 
     # 3. Calculate stretch factor and check if we need to add extra spacing
-    max_stretch = 4
+    # 2.7 for 5 letters and below
+    # 2.4 for 6 letters to 8
+    max_stretch = 2.4
     stretch_factor = min(box_width / total_unstretched_width, max_stretch)
     stretched_total_width = total_unstretched_width * stretch_factor
 
