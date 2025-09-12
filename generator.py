@@ -440,25 +440,33 @@ def main():
             with open(coords_path, 'r', encoding='utf-8') as f:
                 coords = json.load(f)
 
-            # Render number
-            number_render(image, coords.get('Number', {}), row['Jersey Characters'], number_font_path)
+            # Read names from CSV (always uppercase)
+            first_name = (row.get('First Name') or '').strip().upper()
+            last_name = (row.get('Last Name') or '').strip().upper()
 
-            # Render first name
-            first_name_render(
-                image,
-                coords.get('FirstName', {}),
-                row['Player Name'].split()[0].upper(),  # Capitalize first name
-                text_font_path,
-                coords.get("Lines", {})
-            )
+            # Render number (skip if blank)
+            jersey_value = (row.get('Jersey Characters') or '').strip()
+            if jersey_value:
+                number_render(image, coords.get('Number', {}), jersey_value, number_font_path)
 
-            # Render last name
-            last_name_render(
-                image,
-                coords.get('LastName', {}),
-                row['Player Name'].split()[-1].upper(),  # Capitalize last name
-                text_font_path
-            )
+            # Render first name (skip if blank)
+            if first_name:
+                first_name_render(
+                    image,
+                    coords.get('FirstName', {}),
+                    first_name,
+                    text_font_path,
+                    coords.get("Lines", {})
+                )
+
+            # Render last name (skip if blank)
+            if last_name:
+                last_name_render(
+                    image,
+                    coords.get('LastName', {}),
+                    last_name,
+                    text_font_path
+                )
 
             # Render sport
             render_sport(
