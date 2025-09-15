@@ -4,7 +4,6 @@
 #add printer file png of just logo with no blank
 #jpg for website image png for printer image
 #deduplication for printer images
-#
 
 import csv
 import os
