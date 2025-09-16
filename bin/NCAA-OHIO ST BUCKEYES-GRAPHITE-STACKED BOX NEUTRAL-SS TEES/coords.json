@@ -1,0 +1,38 @@
+{
+  "Number": {
+    "coords": [1291,935,1362,1030],
+    "color": "#c32033",
+    "border": "False",
+    "border_color": "#000000",
+    "border_width": 0
+  },
+  "FirstName": {
+    "y-coords": [1020,1064],
+    "color": "#c32033",
+    "border": "False",
+    "border_color": "#000000",
+    "spacing_factor": 0.2,
+    "border_width": 0
+  },
+  "LastName": {
+    "coords": [749,1068,1307,1216],
+    "color": "#c32033",
+    "border": "False",
+    "border_color": "#000000",
+    "spacing_factor": 0.04,
+    "border_width": 0
+  },
+  "Sport": {
+    "coords": [751,1238,1305,1290],
+    "color": "#c32033",
+    "border": "False",
+    "border_color": "#000000",
+    "spacing_factor": 0.35,
+    "border_width": 1
+  },
+  "Lines":
+    {
+      "coords": [739,1037,1317,1047],
+      "color": "#000000"
+    }
+}
