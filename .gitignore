@@ -1,7 +1,3 @@
 *.csv
-*.png
-*.ttf
-*.otf
-*.jpg
-*.json
 *.zip
+/output/*
