@@ -1,13 +1,13 @@
 {
   "Number": {
-    "coords": [1291,935,1362,1030],
+    "coords": [5048,3042,5910,3708],
     "color": "#c32033",
     "border": "False",
     "border_color": "#000000",
     "border_width": 0
   },
   "FirstName": {
-    "y-coords": [1020,1064],
+    "y-coords": [3605,3878],
     "color": "#c32033",
     "border": "False",
     "border_color": "#000000",
@@ -32,7 +32,7 @@
   },
   "Lines":
     {
-      "coords": [739,1037,1317,1047],
+      "coords": [2583,3665,5933,3738],
       "color": "#000000"
     }
 }

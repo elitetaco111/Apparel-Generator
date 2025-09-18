@@ -11,7 +11,7 @@
     "color": "#c32033",
     "border": "False",
     "border_color": "#000000",
-    "spacing_factor": 0.2,
+    "spacing_factor": 0.3,
     "border_width": 0
   },
   "LastName": {
