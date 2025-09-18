@@ -6,6 +6,15 @@ import os
 import json
 from PIL import Image, ImageDraw, ImageFont
 
+#TODO
+#name output files Name + -1.jpg
+#space between name letters (spacing factor logic)
+#print file name = description+png
+#shift number left
+#change bar split to percentage not fixed pixels
+#two output folders - one for per-row, one for print files
+#choose input file
+
 BIN_DIR = os.path.join(os.getcwd(), 'bin')
 OUTPUT_DIR = os.path.join(os.getcwd(), 'output')
 
@@ -355,7 +364,8 @@ def build_image_from_assets(row, asset_path):
 
     first_name = (row.get('First Name') or '').strip().upper()
     last_name = (row.get('Last Name') or '').strip().upper()
-    jersey_value = (row.get('Jersey Characters') or '').strip()
+    # Use Jersey Number, fall back to Jersey Characters
+    jersey_value = (row.get('Jersey Number') or row.get('Jersey Characters') or '').strip()
 
     if jersey_value:
         number_render(image, coords.get('Number', {}), jersey_value, number_font_path)
@@ -363,7 +373,7 @@ def build_image_from_assets(row, asset_path):
         first_name_render(image, coords.get('FirstName', {}), first_name, text_font_path, coords.get("Lines", {}))
     if last_name:
         last_name_render(image, coords.get('LastName', {}), last_name, text_font_path)
-    render_sport(image, coords.get('Sport', {}), row['Sport Specific'].upper(), text_font_path)
+    render_sport(image, coords.get('Sport', {}), (row.get('Sport Specific') or '').upper(), text_font_path)
 
     return image, None
 
@@ -380,30 +390,24 @@ def main():
         print(f"ERROR: bin directory not found at {BIN_DIR}")
         return
 
-    processed_art_player = set()
-
-    # Preload already existing combo files to avoid regenerating on reruns
-    for fname in os.listdir(OUTPUT_DIR):
-        if fname.lower().endswith(".png"):
-            parts = fname.rsplit(".", 1)[0].split("-")
-            if len(parts) >= 2:
-                art_type_part = parts[0]
-                player_part = "-".join(parts[1:])  # player name may contain dashes (already sanitized)
-                processed_art_player.add(combo_key(art_type_part, player_part))
+    # Runtime-only registry of created combos
+    processed_art_player = set()  # set of (art_type_lower, player_name_lower)
+    combos_created = []           # optional list for summary/debug
 
     with open('to_create.csv', newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-            player_name = row.get('Name', '').strip()
-            art_type_val = row.get('Art Type', '').strip()
+            product_id = (row.get('Name') or '').strip()  # used only for per-row output filename
+            art_type_val = (row.get('Art Type') or '').strip()
+            player_name = (row.get('Player Name') or '').strip()  # correct source for combo logic
 
-            # Normal per-row image (kept as-is)
+            # Normal per-row image
             asset_folder = get_asset_folder(row)
             asset_path = os.path.join(BIN_DIR, asset_folder)
             if os.path.isdir(asset_path):
                 image, err = build_image_from_assets(row, asset_path)
                 if image:
-                    safe_base = sanitize_filename(f"{asset_folder}-{player_name}-1")
+                    safe_base = sanitize_filename(f"{asset_folder}-{product_id}-1")
                     output_path = os.path.join(OUTPUT_DIR, f"{safe_base}.png")
                     image.save(output_path)
                     print(f"Created style: {output_path}")
@@ -412,27 +416,32 @@ def main():
             else:
                 print(f"Skipping: asset folder missing {asset_path}")
 
-            # One-per (ArtType + PlayerName) print file
+            # One-per (Art Type + Player Name) print file, runtime only
             if art_type_val and player_name:
                 key = combo_key(art_type_val, player_name)
                 if key not in processed_art_player:
                     art_only_path = os.path.join(BIN_DIR, art_type_val)
                     extra_base = f"{sanitize_filename(art_type_val)}-{sanitize_filename(player_name)}"
                     extra_out = os.path.join(OUTPUT_DIR, f"{extra_base}.png")
-                    if os.path.exists(extra_out):
-                        print(f"Combo exists (skip): {extra_out}")
-                        processed_art_player.add(key)
-                        continue
+
                     if os.path.isdir(art_only_path):
                         extra_image, err2 = build_image_from_assets(row, art_only_path)
                         if extra_image:
                             extra_image.save(extra_out)
                             print(f"Created combo: {extra_out}")
+                            processed_art_player.add(key)
+                            combos_created.append({"art_type": art_type_val, "player_name": player_name, "path": extra_out})
                         else:
                             print(f"Combo skip ({art_type_val}, {player_name}): {err2}")
+                            processed_art_player.add(key)  # mark to avoid retrying within this run
                     else:
                         print(f"Combo assets missing for {art_type_val} at {art_only_path}")
-                    processed_art_player.add(key)
+                        processed_art_player.add(key)
+
+    # Optional summary
+    print(f"\nCombo summary (this run only): {len(combos_created)} created")
+    for c in combos_created:
+        print(f"- {c['art_type']} - {c['player_name']} -> {c['path']}")
 
 if __name__ == "__main__":
     main()
