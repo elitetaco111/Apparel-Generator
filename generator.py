@@ -6,7 +6,7 @@ import os
 import json
 from PIL import Image, ImageDraw, ImageFont
 
-BIN_DIR = os.path.join(os.getcwd(), 'bin')   # asset folders now live here
+BIN_DIR = os.path.join(os.getcwd(), 'bin')
 OUTPUT_DIR = os.path.join(os.getcwd(), 'output')
 
 def number_render(image, coords, number, font_path):
@@ -337,6 +337,42 @@ def get_asset_folder(row):
     class_text = class_parts[2] if len(class_parts) > 2 else class_parts[-1]
     return f"{team}-{color}-{art_type}-{class_text}"
 
+def build_image_from_assets(row, asset_path):
+    blank_img_path = os.path.join(asset_path, 'blank.png')
+    coords_path = os.path.join(asset_path, 'coords.json')
+    text_font_path = os.path.join(asset_path, 'text.otf')
+    number_font_path = os.path.join(asset_path, 'number.ttf')
+
+    try:
+        image = Image.open(blank_img_path).convert('RGBA')
+    except FileNotFoundError:
+        return None, "blank.png missing"
+    try:
+        with open(coords_path, 'r', encoding='utf-8') as f:
+            coords = json.load(f)
+    except FileNotFoundError:
+        return None, "coords.json missing"
+
+    first_name = (row.get('First Name') or '').strip().upper()
+    last_name = (row.get('Last Name') or '').strip().upper()
+    jersey_value = (row.get('Jersey Characters') or '').strip()
+
+    if jersey_value:
+        number_render(image, coords.get('Number', {}), jersey_value, number_font_path)
+    if first_name:
+        first_name_render(image, coords.get('FirstName', {}), first_name, text_font_path, coords.get("Lines", {}))
+    if last_name:
+        last_name_render(image, coords.get('LastName', {}), last_name, text_font_path)
+    render_sport(image, coords.get('Sport', {}), row['Sport Specific'].upper(), text_font_path)
+
+    return image, None
+
+def sanitize_filename(s):
+    return "".join(c for c in s.replace(" ", "_") if c not in '/\\').strip("_")
+
+def combo_key(art_type, player_name):
+    return (art_type.strip().lower(), player_name.strip().lower())
+
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -344,54 +380,59 @@ def main():
         print(f"ERROR: bin directory not found at {BIN_DIR}")
         return
 
+    processed_art_player = set()
+
+    # Preload already existing combo files to avoid regenerating on reruns
+    for fname in os.listdir(OUTPUT_DIR):
+        if fname.lower().endswith(".png"):
+            parts = fname.rsplit(".", 1)[0].split("-")
+            if len(parts) >= 2:
+                art_type_part = parts[0]
+                player_part = "-".join(parts[1:])  # player name may contain dashes (already sanitized)
+                processed_art_player.add(combo_key(art_type_part, player_part))
+
     with open('to_create.csv', newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
+            player_name = row.get('Name', '').strip()
+            art_type_val = row.get('Art Type', '').strip()
+
+            # Normal per-row image (kept as-is)
             asset_folder = get_asset_folder(row)
             asset_path = os.path.join(BIN_DIR, asset_folder)
-
-            if not os.path.isdir(asset_path):
+            if os.path.isdir(asset_path):
+                image, err = build_image_from_assets(row, asset_path)
+                if image:
+                    safe_base = sanitize_filename(f"{asset_folder}-{player_name}-1")
+                    output_path = os.path.join(OUTPUT_DIR, f"{safe_base}.png")
+                    image.save(output_path)
+                    print(f"Created style: {output_path}")
+                else:
+                    print(f"Skipping {asset_folder}: {err}")
+            else:
                 print(f"Skipping: asset folder missing {asset_path}")
-                continue
 
-            blank_img_path = os.path.join(asset_path, 'blank.png')
-            coords_path = os.path.join(asset_path, 'coords.json')
-            text_font_path = os.path.join(asset_path, 'text.otf')
-            number_font_path = os.path.join(asset_path, 'number.ttf')
-
-            try:
-                image = Image.open(blank_img_path).convert('RGBA')
-            except FileNotFoundError:
-                print(f"Skipping: blank.png missing in {asset_path}")
-                continue
-
-            try:
-                with open(coords_path, 'r', encoding='utf-8') as f:
-                    coords = json.load(f)
-            except FileNotFoundError:
-                print(f"Skipping: coords.json missing in {asset_path}")
-                continue
-
-            first_name = (row.get('First Name') or '').strip().upper()
-            last_name = (row.get('Last Name') or '').strip().upper()
-            jersey_value = (row.get('Jersey Characters') or '').strip()
-
-            if jersey_value:
-                number_render(image, coords.get('Number', {}), jersey_value, number_font_path)
-
-            if first_name:
-                first_name_render(image, coords.get('FirstName', {}), first_name, text_font_path, coords.get("Lines", {}))
-
-            if last_name:
-                last_name_render(image, coords.get('LastName', {}), last_name, text_font_path)
-
-            render_sport(image, coords.get('Sport', {}), row['Sport Specific'].upper(), text_font_path)
-
-            safe_base = f"{asset_folder}-{row['Name']}-1".replace("/", "_").replace("\\", "_")
-            output_path = os.path.join(OUTPUT_DIR, f"{safe_base}.png")
-            image.save(output_path)
-            print(f"Created style: {output_path}")
+            # One-per (ArtType + PlayerName) print file
+            if art_type_val and player_name:
+                key = combo_key(art_type_val, player_name)
+                if key not in processed_art_player:
+                    art_only_path = os.path.join(BIN_DIR, art_type_val)
+                    extra_base = f"{sanitize_filename(art_type_val)}-{sanitize_filename(player_name)}"
+                    extra_out = os.path.join(OUTPUT_DIR, f"{extra_base}.png")
+                    if os.path.exists(extra_out):
+                        print(f"Combo exists (skip): {extra_out}")
+                        processed_art_player.add(key)
+                        continue
+                    if os.path.isdir(art_only_path):
+                        extra_image, err2 = build_image_from_assets(row, art_only_path)
+                        if extra_image:
+                            extra_image.save(extra_out)
+                            print(f"Created combo: {extra_out}")
+                        else:
+                            print(f"Combo skip ({art_type_val}, {player_name}): {err2}")
+                    else:
+                        print(f"Combo assets missing for {art_type_val} at {art_only_path}")
+                    processed_art_player.add(key)
 
 if __name__ == "__main__":
     main()
-
