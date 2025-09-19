@@ -8,18 +8,15 @@ from PIL import Image, ImageDraw, ImageFont
 from tkinter import Tk, filedialog
 
 #TODO
-#name output files Name + -1.jpg
 #space between name letters (spacing factor logic)
-#print file name = description+png
 #shift number left
-#change bar split to percentage not fixed pixels
 
 BIN_DIR = os.path.join(os.getcwd(), 'bin')
 OUTPUT_DIR = os.path.join(os.getcwd(), 'output')
 WEB_DIR = os.path.join(OUTPUT_DIR, 'web-images')        # main images
 PRINT_DIR = os.path.join(OUTPUT_DIR, 'printer-images')  # print files
 
-# Global: percent of the line bar width used as padding on EACH side of the name gap
+# percent of the line bar width used as padding on EACH side of the name gap
 GAP_PADDING_PCT = 0.08  # 8% per side
 
 def number_render(image, coords, number, font_path):
