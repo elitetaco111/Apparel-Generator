@@ -13,10 +13,11 @@ from tkinter import Tk, filedialog
 #print file name = description+png
 #shift number left
 #change bar split to percentage not fixed pixels
-#two output folders - one for per-row, one for print files
 
 BIN_DIR = os.path.join(os.getcwd(), 'bin')
 OUTPUT_DIR = os.path.join(os.getcwd(), 'output')
+WEB_DIR = os.path.join(OUTPUT_DIR, 'web-images')        # main images
+PRINT_DIR = os.path.join(OUTPUT_DIR, 'printer-images')  # print files
 
 def number_render(image, coords, number, font_path):
     draw = ImageDraw.Draw(image)
@@ -400,7 +401,8 @@ def choose_input_csv():
         return ""
 
 def main():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(WEB_DIR, exist_ok=True)
+    os.makedirs(PRINT_DIR, exist_ok=True)
 
     if not os.path.isdir(BIN_DIR):
         print(f"ERROR: bin directory not found at {BIN_DIR}")
@@ -431,7 +433,7 @@ def main():
                     # Main image filename: <Name>-1.png (no JPEG conversion)
                     product_id_s = (row.get('Name') or '').strip()
                     main_base = sanitize_filename(f"{product_id_s}-1")
-                    output_path = os.path.join(OUTPUT_DIR, f"{main_base}.png")
+                    output_path = os.path.join(WEB_DIR, f"{main_base}.png")
                     image.save(output_path)
                     print(f"Created style: {output_path}")
                 else:
@@ -447,7 +449,7 @@ def main():
                     # Print file filename: <Description>.png
                     desc = (row.get('Description') or '').strip()
                     extra_base = sanitize_filename(desc)
-                    extra_out = os.path.join(OUTPUT_DIR, f"{extra_base}.png")
+                    extra_out = os.path.join(PRINT_DIR, f"{extra_base}.png")
 
                     if os.path.isdir(art_only_path):
                         extra_image, err2 = build_image_from_assets(row, art_only_path)
