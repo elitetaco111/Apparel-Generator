@@ -4,6 +4,7 @@
 import csv
 import os
 import json
+import shutil
 from PIL import Image, ImageDraw, ImageFont
 from tkinter import Tk, filedialog
 
@@ -407,6 +408,14 @@ def choose_input_csv():
         return ""
 
 def main():
+    # Reset output directory each run
+    if os.path.isdir(OUTPUT_DIR):
+        try:
+            shutil.rmtree(OUTPUT_DIR)
+            print(f"Cleared output directory: {OUTPUT_DIR}")
+        except Exception as e:
+            print(f"ERROR: Failed to clear output directory {OUTPUT_DIR}: {e}")
+            return
     os.makedirs(WEB_DIR, exist_ok=True)
     os.makedirs(PRINT_DIR, exist_ok=True)
 
