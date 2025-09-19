@@ -11,7 +11,7 @@
     "color": "#c32033",
     "border": "False",
     "border_color": "#000000",
-    "spacing_factor": 0.3,
+    "spacing_factor": 0.2,
     "border_width": 0
   },
   "LastName": {
@@ -19,7 +19,7 @@
     "color": "#c32033",
     "border": "False",
     "border_color": "#000000",
-    "spacing_factor": 0.04,
+    "spacing_factor": 0.1,
     "border_width": 0
   },
   "Sport": {
