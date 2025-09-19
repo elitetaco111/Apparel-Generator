@@ -5,6 +5,7 @@ import csv
 import os
 import json
 from PIL import Image, ImageDraw, ImageFont
+from tkinter import Tk, filedialog  # added for file picker
 
 #TODO
 #name output files Name + -1.jpg
@@ -13,7 +14,6 @@ from PIL import Image, ImageDraw, ImageFont
 #shift number left
 #change bar split to percentage not fixed pixels
 #two output folders - one for per-row, one for print files
-#choose input file
 
 BIN_DIR = os.path.join(os.getcwd(), 'bin')
 OUTPUT_DIR = os.path.join(os.getcwd(), 'output')
@@ -383,6 +383,22 @@ def sanitize_filename(s):
 def combo_key(art_type, player_name):
     return (art_type.strip().lower(), player_name.strip().lower())
 
+def choose_input_csv():
+    try:
+        root = Tk()
+        root.withdraw()
+        root.update()
+        path = filedialog.askopenfilename(
+            title="Select input CSV",
+            initialdir=os.getcwd(),
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        root.destroy()
+        return path or ""
+    except Exception as e:
+        print(f"File dialog error: {e}")
+        return ""
+
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -390,16 +406,21 @@ def main():
         print(f"ERROR: bin directory not found at {BIN_DIR}")
         return
 
-    # Runtime-only registry of created combos
-    processed_art_player = set()  # set of (art_type_lower, player_name_lower)
-    combos_created = []           # optional list for summary/debug
+    input_csv = choose_input_csv()
+    if not input_csv:
+        print("No input file selected. Exiting.")
+        return
 
-    with open('to_create.csv', newline='', encoding='utf-8') as csvfile:
+    # Runtime-only registry of created combos
+    processed_art_player = set()
+    combos_created = []
+
+    with open(input_csv, newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             product_id = (row.get('Name') or '').strip()  # used only for per-row output filename
             art_type_val = (row.get('Art Type') or '').strip()
-            player_name = (row.get('Player Name') or '').strip()  # correct source for combo logic
+            player_name = (row.get('Player Name') or '').strip()
 
             # Normal per-row image
             asset_folder = get_asset_folder(row)
@@ -433,7 +454,7 @@ def main():
                             combos_created.append({"art_type": art_type_val, "player_name": player_name, "path": extra_out})
                         else:
                             print(f"Combo skip ({art_type_val}, {player_name}): {err2}")
-                            processed_art_player.add(key)  # mark to avoid retrying within this run
+                            processed_art_player.add(key)
                     else:
                         print(f"Combo assets missing for {art_type_val} at {art_only_path}")
                         processed_art_player.add(key)
