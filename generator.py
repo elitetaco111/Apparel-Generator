@@ -5,7 +5,7 @@ import csv
 import os
 import json
 from PIL import Image, ImageDraw, ImageFont
-from tkinter import Tk, filedialog  # added for file picker
+from tkinter import Tk, filedialog
 
 #TODO
 #name output files Name + -1.jpg
@@ -428,8 +428,10 @@ def main():
             if os.path.isdir(asset_path):
                 image, err = build_image_from_assets(row, asset_path)
                 if image:
-                    safe_base = sanitize_filename(f"{asset_folder}-{product_id}-1")
-                    output_path = os.path.join(OUTPUT_DIR, f"{safe_base}.png")
+                    # Main image filename: <Name>-1.png (no JPEG conversion)
+                    product_id_s = (row.get('Name') or '').strip()
+                    main_base = sanitize_filename(f"{product_id_s}-1")
+                    output_path = os.path.join(OUTPUT_DIR, f"{main_base}.png")
                     image.save(output_path)
                     print(f"Created style: {output_path}")
                 else:
@@ -442,7 +444,9 @@ def main():
                 key = combo_key(art_type_val, player_name)
                 if key not in processed_art_player:
                     art_only_path = os.path.join(BIN_DIR, art_type_val)
-                    extra_base = f"{sanitize_filename(art_type_val)}-{sanitize_filename(player_name)}"
+                    # Print file filename: <Description>.png
+                    desc = (row.get('Description') or '').strip()
+                    extra_base = sanitize_filename(desc)
                     extra_out = os.path.join(OUTPUT_DIR, f"{extra_base}.png")
 
                     if os.path.isdir(art_only_path):
