@@ -19,6 +19,9 @@ OUTPUT_DIR = os.path.join(os.getcwd(), 'output')
 WEB_DIR = os.path.join(OUTPUT_DIR, 'web-images')        # main images
 PRINT_DIR = os.path.join(OUTPUT_DIR, 'printer-images')  # print files
 
+# Global: percent of the line bar width used as padding on EACH side of the name gap
+GAP_PADDING_PCT = 0.08  # 8% per side
+
 def number_render(image, coords, number, font_path):
     draw = ImageDraw.Draw(image)
     x1, y1, x2, y2 = coords.get('coords', [0,0,0,0])
@@ -134,12 +137,18 @@ def first_name_render(image, coords, first_name, font_path, lines_coords):
 def draw_lines(image, name_width, coords):
     x1, y1, x2, y2 = coords.get('coords', [0, 0, 0, 0])
     color = coords.get('color', '#ffffff')
-    gap_width = name_width + 80
+
+    # Compute gap as: name width + padding on both sides, where padding is a
+    # global percent of the line bar width (consistent across all designs).
+    bar_width = max(0, x2 - x1)
+    side_pad = int(bar_width * GAP_PADDING_PCT)
+    gap_width = min(bar_width, max(0, name_width + 2 * side_pad))
+
+    # Keep the gap centered under the centered first name
     image_center_x = image.width // 2
-    gap_left = image_center_x - gap_width // 2
-    gap_right = gap_left + gap_width
-    gap_left = max(gap_left, x1)
-    gap_right = min(gap_right, x2)
+    gap_left = max(x1, image_center_x - gap_width // 2)
+    gap_right = min(x2, gap_left + gap_width)
+
     draw = ImageDraw.Draw(image)
     if gap_left > x1:
         draw.rectangle([x1, y1, gap_left, y2], fill=color)
